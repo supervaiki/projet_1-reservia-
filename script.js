@@ -14,6 +14,9 @@ function initializeApp() {
     initializeHotelCards();
     initializeNavigation();
     initializeFavorites();
+    initializeSortFunctionality();
+    initializeAccessibility();
+    addFavoritesManagement();
     console.log('Reservia booking platform initialized');
 }
 
@@ -346,6 +349,7 @@ function toggleFavorite(index, button) {
     }
     
     localStorage.setItem('reservia-favorites', JSON.stringify(favorites));
+    updateFavoritesDisplay();
 }
 
 function loadFavorites() {
@@ -379,3 +383,268 @@ function hideLoadingState() {
         searchButton.disabled = false;
     }
 }
+
+// Sort functionality
+function initializeSortFunctionality() {
+    createSortControls();
+}
+
+function createSortControls() {
+    const accommodationsSection = document.querySelector('.hebergement section');
+    const title = accommodationsSection.querySelector('h2');
+    
+    const sortContainer = document.createElement('div');
+    sortContainer.className = 'sort-controls';
+    sortContainer.innerHTML = `
+        <label for="sort-select">Trier par:</label>
+        <select id="sort-select">
+            <option value="default">Pertinence</option>
+            <option value="price-low">Prix croissant</option>
+            <option value="price-high">Prix décroissant</option>
+            <option value="rating">Note</option>
+            <option value="name">Nom A-Z</option>
+        </select>
+    `;
+    
+    title.parentNode.insertBefore(sortContainer, title.nextSibling);
+    
+    document.getElementById('sort-select').addEventListener('change', handleSort);
+}
+
+function handleSort(event) {
+    const sortType = event.target.value;
+    const hotelContainer = document.querySelector('.blocartes');
+    const hotels = Array.from(hotelContainer.querySelectorAll('article'));
+    
+    hotels.sort((a, b) => {
+        switch(sortType) {
+            case 'price-low':
+                return getHotelPrice(a) - getHotelPrice(b);
+            case 'price-high':
+                return getHotelPrice(b) - getHotelPrice(a);
+            case 'rating':
+                return getHotelRating(b) - getHotelRating(a);
+            case 'name':
+                return getHotelName(a).localeCompare(getHotelName(b));
+            default:
+                return 0;
+        }
+    });
+    
+    // Clear and re-append sorted hotels
+    hotelContainer.innerHTML = '';
+    const firstColumn = document.createElement('div');
+    const secondColumn = document.createElement('div');
+    
+    hotels.forEach((hotel, index) => {
+        if (index < 3) {
+            firstColumn.appendChild(hotel);
+        } else {
+            secondColumn.appendChild(hotel);
+        }
+    });
+    
+    hotelContainer.appendChild(firstColumn);
+    hotelContainer.appendChild(secondColumn);
+}
+
+function getHotelPrice(hotel) {
+    const priceText = hotel.querySelector('.description')?.textContent || '0';
+    return parseInt(priceText.match(/\d+/)?.[0] || '0');
+}
+
+function getHotelRating(hotel) {
+    return hotel.querySelectorAll('.fas.fa-star.bleu').length;
+}
+
+function getHotelName(hotel) {
+    return hotel.querySelector('h3')?.textContent || '';
+}
+
+// Accessibility improvements
+function initializeAccessibility() {
+    // Add ARIA labels
+    addAriaLabels();
+    
+    // Add keyboard navigation
+    addKeyboardNavigation();
+    
+    // Add focus management
+    addFocusManagement();
+}
+
+function addAriaLabels() {
+    // Add ARIA labels to interactive elements
+    const searchInput = document.querySelector('input[name="localisation"]');
+    if (searchInput) {
+        searchInput.setAttribute('aria-label', 'Rechercher une destination');
+        searchInput.setAttribute('aria-describedby', 'search-help');
+    }
+    
+    const filters = document.querySelectorAll('.filter-button');
+    filters.forEach(filter => {
+        const filterText = filter.querySelector('.descriptionfiltre')?.textContent;
+        filter.setAttribute('aria-label', `Filtre ${filterText}`);
+        filter.setAttribute('role', 'button');
+        filter.setAttribute('tabindex', '0');
+    });
+    
+    const hotelCards = document.querySelectorAll('article');
+    hotelCards.forEach(card => {
+        const hotelName = card.querySelector('h3')?.textContent;
+        card.setAttribute('aria-label', `Voir détails de ${hotelName}`);
+        card.setAttribute('role', 'button');
+        card.setAttribute('tabindex', '0');
+    });
+}
+
+function addKeyboardNavigation() {
+    // Allow filters to be activated with keyboard
+    const filters = document.querySelectorAll('.filter-button');
+    filters.forEach(filter => {
+        filter.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                filter.click();
+            }
+        });
+    });
+    
+    // Allow hotel cards to be activated with keyboard
+    const hotelCards = document.querySelectorAll('article');
+    hotelCards.forEach(card => {
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                card.click();
+            }
+        });
+    });
+}
+
+function addFocusManagement() {
+    // Improve focus visibility
+    const style = document.createElement('style');
+    style.textContent = `
+        .filter-button:focus,
+        article:focus,
+        .guest-btn:focus,
+        input:focus,
+        button:focus,
+        select:focus {
+            outline: 3px solid #0065FC;
+            outline-offset: 2px;
+        }
+        
+        .filter-button:focus,
+        article:focus {
+            box-shadow: 0 0 0 3px rgba(0, 101, 252, 0.3);
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Favorites management
+function addFavoritesManagement() {
+    createFavoritesSection();
+}
+
+function createFavoritesSection() {
+    const main = document.querySelector('main');
+    const favoritesSection = document.createElement('section');
+    favoritesSection.className = 'favorites-section';
+    favoritesSection.innerHTML = `
+        <div class="favorites-header">
+            <h2>Mes favoris</h2>
+            <button class="toggle-favorites" onclick="toggleFavoritesView()">
+                <i class="fas fa-heart"></i> Voir mes favoris (<span id="favorites-count">0</span>)
+            </button>
+        </div>
+        <div class="favorites-list" id="favorites-list" style="display: none;">
+            <p id="no-favorites">Aucun favori sélectionné</p>
+        </div>
+    `;
+    
+    // Insert before activities section
+    const activitiesSection = document.getElementById('Activites');
+    main.insertBefore(favoritesSection, activitiesSection);
+    
+    updateFavoritesDisplay();
+}
+
+window.toggleFavoritesView = function() {
+    const favoritesList = document.getElementById('favorites-list');
+    const isVisible = favoritesList.style.display !== 'none';
+    
+    favoritesList.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+        updateFavoritesDisplay();
+    }
+};
+
+function updateFavoritesDisplay() {
+    const favorites = JSON.parse(localStorage.getItem('reservia-favorites') || '[]');
+    const favoritesCount = document.getElementById('favorites-count');
+    const favoritesList = document.getElementById('favorites-list');
+    const noFavorites = document.getElementById('no-favorites');
+    
+    favoritesCount.textContent = favorites.length;
+    
+    if (favorites.length === 0) {
+        noFavorites.style.display = 'block';
+        return;
+    }
+    
+    noFavorites.style.display = 'none';
+    
+    // Create favorite hotel cards
+    const hotelCards = document.querySelectorAll('.blocartes article, aside article');
+    let favoritesHTML = '<div class="favorites-grid">';
+    
+    favorites.forEach(index => {
+        if (hotelCards[index]) {
+            const hotel = hotelCards[index];
+            const hotelName = hotel.querySelector('h3')?.textContent || '';
+            const hotelPrice = hotel.querySelector('.description, span')?.textContent || '';
+            const hotelImage = hotel.querySelector('img')?.src || '';
+            
+            favoritesHTML += `
+                <div class="favorite-card">
+                    <img src="${hotelImage}" alt="${hotelName}">
+                    <div class="favorite-info">
+                        <h4>${hotelName}</h4>
+                        <p>${hotelPrice}</p>
+                        <button onclick="removeFavorite(${index})" class="remove-favorite">
+                            <i class="fas fa-trash"></i> Retirer
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    favoritesHTML += '</div>';
+    favoritesList.innerHTML = favoritesHTML;
+}
+
+window.removeFavorite = function(index) {
+    const favorites = JSON.parse(localStorage.getItem('reservia-favorites') || '[]');
+    const favoriteIndex = favorites.indexOf(index);
+    if (favoriteIndex > -1) {
+        favorites.splice(favoriteIndex, 1);
+        localStorage.setItem('reservia-favorites', JSON.stringify(favorites));
+        
+        // Update UI
+        const hotelCards = document.querySelectorAll('article');
+        if (hotelCards[index]) {
+            const favoriteBtn = hotelCards[index].querySelector('.favorite-btn');
+            if (favoriteBtn) {
+                favoriteBtn.innerHTML = '<i class="far fa-heart"></i>';
+                favoriteBtn.classList.remove('favorited');
+            }
+        }
+        
+        updateFavoritesDisplay();
+    }
+};
